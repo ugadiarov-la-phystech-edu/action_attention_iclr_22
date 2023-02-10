@@ -1,9 +1,12 @@
+import collections
 import copy as cp
+import os
 import shutil
 from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import wandb
 from torch.utils import data as torch_data
 from ...stack import StackElement
 from ...constants import Constants
@@ -102,6 +105,12 @@ class Train(StackElement):
 
     def run(self, bundle: dict, viz=False) -> dict:
 
+        wandb.init(
+            project=os.environ['PROJECT'],
+            save_code=True,
+            name='run-0'
+        )
+
         model = bundle[Constants.MODEL]
         optimizer = bundle[Constants.OPTIM]
         train_loader = bundle[Constants.TRAIN_LOADER]
@@ -119,6 +128,8 @@ class Train(StackElement):
 
             model.train()
             train_loss = 0
+            epoch_metrics = collections.Counter()
+            n = 0
 
             for batch_idx, data_batch in enumerate(train_loader):
 
@@ -135,11 +146,14 @@ class Train(StackElement):
                         plt.imshow(data_batch[2][0, i].cpu().numpy().transpose((1, 2, 0)))
                     plt.show()
 
-                loss = model.contrastive_loss(*data_batch)
+                loss, metrics = model.contrastive_loss(*data_batch)
 
                 loss.backward()
                 train_loss += loss.item()
                 optimizer.step()
+                epoch_metrics['loss'] += loss.item()
+                epoch_metrics += metrics
+                n += data_batch[0].size()[0]
 
                 losses.append(loss.item())
 
@@ -154,6 +168,9 @@ class Train(StackElement):
                 step += 1
 
             avg_loss = train_loss / len(train_loader.dataset)
+            record = {key: value / n for key, value in epoch_metrics.items()}
+            record['epoch'] = epoch
+            wandb.log(record)
             self.logger.info('====> Epoch: {} Average loss: {:.6f}'.format(epoch, avg_loss))
 
             if avg_loss < best_loss:

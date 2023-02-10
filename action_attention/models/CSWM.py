@@ -117,7 +117,7 @@ class CSWM(nn.Module):
 
         loss = self.pos_loss + self.neg_loss
 
-        return loss
+        return loss, {'transition_loss': self.pos_loss.item(), 'contrastive_loss': self.neg_loss.item()}
 
     def extract_objects_(self, obs, next_obs):
 

@@ -92,14 +92,15 @@ def get_colors(cmap='Set1', num_colors=9):
 class BlockPushing(gym.Env):
     """Gym environment for block pushing task."""
 
-    def __init__(self, width=5, height=5, render_type='cubes', num_objects=5, seed=None):
+    def __init__(self, width=5, height=5, render_type='cubes', num_objects=5, num_static_objects=0, seed=None):
 
         self.width = width
         self.height = height
         self.render_type = render_type
 
         self.num_objects = num_objects
-        self.num_actions = 4 * self.num_objects  # Move NESW
+        self.num_movable_objects = self.num_objects - num_static_objects
+        self.num_actions = 4 * self.num_movable_objects  # Move NESW
 
         self.colors = get_colors(num_colors=max(9, self.num_objects))
 

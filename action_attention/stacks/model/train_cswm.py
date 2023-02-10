@@ -56,18 +56,21 @@ class InitModel(StackElement):
 
 class InitTransitionsLoader(StackElement):
     # Initialize training loader.
-    def __init__(self, root_path, batch_size, factored_actions=False):
+    def __init__(self, root_path, batch_size, num_dataloader_workers, factored_actions=False):
 
         super().__init__()
         self.root_path = root_path
         self.batch_size = batch_size
         self.factored_actions = factored_actions
+        self.num_dataloader_workers = num_dataloader_workers
         self.OUTPUT_KEYS = {Constants.TRAIN_LOADER}
 
     def run(self, bundle: dict, viz=False) -> dict:
 
         dataset = TransitionsDataset(self.root_path, self.factored_actions)
-        train_loader = torch_data.DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=16)
+        train_loader = torch_data.DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_dataloader_workers
+        )
         return {Constants.TRAIN_LOADER: train_loader}
 
 

@@ -32,12 +32,13 @@ def config():
     model_load_path = None
     dataset_path = "data/shapes_train"
     eval_dataset_path = "data/shapes_eval"
+    num_dataloader_workers = 16
     viz_names = None
 
 
 @ex.automain
 def main(seed, use_hard_attention, use_soft_attention, device, learning_rate, batch_size, epochs, model_save_path,
-         model_load_path, dataset_path, eval_dataset_path, viz_names):
+         model_load_path, dataset_path, eval_dataset_path, num_dataloader_workers, viz_names):
 
     model_config = get_model_config()
     logger = utils.Logger()
@@ -62,6 +63,7 @@ def main(seed, use_hard_attention, use_soft_attention, device, learning_rate, ba
         stack.register(InitTransitionsLoader(
             root_path=dataset_path,
             batch_size=batch_size,
+            num_dataloader_workers=num_dataloader_workers,
             factored_actions=False
         ))
         stack.register(Train(

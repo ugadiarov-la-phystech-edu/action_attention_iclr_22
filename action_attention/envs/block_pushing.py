@@ -28,6 +28,21 @@ def triangle(r0, c0, width, im_size):
     return skimage.draw.polygon(rr, cc, im_size)
 
 
+def parallelogram(r0, c0, width, im_size):
+    rr, cc = [r0, r0 + width, r0 + width, r0], [c0, c0 + width // 2, c0 + width, c0 + width - width // 2]
+    return skimage.draw.polygon(rr, cc, im_size)
+
+
+def cross(r0, c0, width, im_size):
+    diff1 = width // 3 + 1
+    diff2 = 2 * width // 3
+    rr = [r0 + diff1, r0 + diff2, r0 + diff2, r0 + width, r0 + width,
+            r0 + diff2, r0 + diff2, r0 + diff1, r0 + diff1, r0, r0, r0 + diff1]
+    cc = [c0, c0, c0 + diff1, c0 + diff1, c0 + diff2, c0 + diff2, c0 + width,
+            c0 + width, c0 + diff2, c0 + diff2, c0 + diff1, c0 + diff1]
+    return skimage.draw.polygon(rr, cc, im_size)
+
+
 def fig2rgb_array(fig):
     fig.canvas.draw()
     buffer = fig.canvas.tostring_rgb()
@@ -129,18 +144,29 @@ class BlockPushing(gym.Env):
         elif self.render_type == 'shapes':
             im = np.zeros((self.width*10, self.height*10, 3), dtype=np.float32)
             for idx, pos in enumerate(self.objects):
-                if idx % 3 == 0:
+                shape_id = idx % 5
+                if shape_id == 0:
                     rr, cc = skimage.draw.circle(
                         pos[0]*10 + 5, pos[1]*10 + 5, 5, im.shape)
                     im[rr, cc, :] = self.colors[idx][:3]
-                elif idx % 3 == 1:
+                elif shape_id == 1:
                     rr, cc = triangle(
                         pos[0]*10, pos[1]*10, 10, im.shape)
                     im[rr, cc, :] = self.colors[idx][:3]
-                else:
+                elif shape_id == 2:
                     rr, cc = square(
                         pos[0]*10, pos[1]*10, 10, im.shape)
                     im[rr, cc, :] = self.colors[idx][:3]
+                elif shape_id == 3:
+                    rr, cc = parallelogram(
+                        pos[0] * 10, pos[1] * 10, 10, im.shape)
+                    im[rr, cc, :] = self.colors[idx][:3]
+                elif shape_id == 4:
+                    rr, cc = cross(
+                        pos[0] * 10, pos[1] * 10, 10, im.shape)
+                    im[rr, cc, :] = self.colors[idx][:3]
+                else:
+                    raise ValueError(f'Unexpected shape of type: {shape_id}')
             return im
         elif self.render_type == 'cubes':
             return render_cubes(self.objects, self.width)

@@ -1,3 +1,5 @@
+import torch
+
 from action_attention import utils
 from action_attention.stack import Stack, Seeds, SacredLog, Sieve
 from action_attention.stacks.model.train_cswm import InitModel, InitTransitionsLoader, InitPathLoader, Train, Eval
@@ -49,6 +51,7 @@ def config():
 def main(seed, use_hard_attention, use_soft_attention, device, learning_rate, batch_size, epochs, model_save_path,
          model_load_path, dataset_path, num_episodes, num_episode_steps, eval_dataset_path, eval_num_episodes,
          eval_num_episode_steps, eval_clip_length, num_workers, need_train, project, run_name, group, viz_names):
+    torch.set_float32_matmul_precision('medium')
 
     model_config = get_model_config()
     logger = utils.Logger()

@@ -1,18 +1,20 @@
 import copy as cp
+import os
 import shutil
 from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch.utils import data as torch_data
+import wandb
+
+from ...loaders.offline_env_dataset import OfflineEnvironmentDataset
 from ...stack import StackElement
 from ...constants import Constants
 from ...models.CSWM import CSWM
 from ...models.CSWMSoftAttention import CSWMSoftAttention
 from ...models.CSWMHardAttention import CSWMHardAttention
 from ... import utils
-from ...loaders.TransitionsDataset import TransitionsDataset
-from ...loaders.PathDataset import PathDataset
 
 
 class InitModel(StackElement):
@@ -53,48 +55,59 @@ class InitModel(StackElement):
 
 class InitTransitionsLoader(StackElement):
     # Initialize training loader.
-    def __init__(self, root_path, batch_size, factored_actions=False):
+    def __init__(self, root_path, num_episodes, num_episode_steps, batch_size, num_workers):
 
         super().__init__()
         self.root_path = root_path
         self.batch_size = batch_size
-        self.factored_actions = factored_actions
+        self.num_episodes = num_episodes
+        self.num_episode_steps = num_episode_steps
+        self.num_workers = num_workers
         self.OUTPUT_KEYS = {Constants.TRAIN_LOADER}
 
     def run(self, bundle: dict, viz=False) -> dict:
-
-        dataset = TransitionsDataset(self.root_path, self.factored_actions)
-        train_loader = torch_data.DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=16)
+        dataset = OfflineEnvironmentDataset(root=self.root_path, num_episodes=self.num_episodes,
+                                            num_episode_steps=self.num_episode_steps, kind='transition')
+        train_loader = torch_data.DataLoader(dataset, batch_size=self.batch_size, shuffle=True,
+                                             num_workers=self.num_workers)
         return {Constants.TRAIN_LOADER: train_loader}
 
 
 class InitPathLoader(StackElement):
     # Initialize evaluation loader.
-    def __init__(self, root_path, path_length, batch_size, factored_actions=False):
+    def __init__(self, root_path, path_length, num_episodes, num_episode_steps, clip_length, batch_size, num_workers):
 
         super().__init__()
         self.root_path = root_path
         self.path_length = path_length
         self.batch_size = batch_size
-        self.factored_actions = factored_actions
+        self.num_episodes = num_episodes
+        self.num_episode_steps = num_episode_steps
+        self.clip_length = clip_length
+        self.num_workers = num_workers
         self.OUTPUT_KEYS = {Constants.EVAL_LOADER}
 
     def run(self, bundle: dict, viz=False) -> dict:
-
-        dataset = PathDataset(self.root_path, self.path_length, self.factored_actions)
-        eval_loader = torch_data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        dataset = OfflineEnvironmentDataset(root=self.root_path, path_length=self.path_length,
+                                            num_episodes=self.num_episodes, num_episode_steps=self.num_episode_steps,
+                                            clip_length=self.clip_length, kind='path')
+        eval_loader = torch_data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False,
+                                            num_workers=self.num_workers)
         return {Constants.EVAL_LOADER: eval_loader}
 
 
 class Train(StackElement):
 
-    def __init__(self, epochs, device, model_save_path):
+    def __init__(self, epochs, device, model_save_path, project, group, run_name):
 
         super(Train, self).__init__()
 
         self.epochs = epochs
         self.device = device
         self.model_save_path = model_save_path
+        self.project = project
+        self.group = group
+        self.run_name = run_name
 
         self.INPUT_KEYS = {Constants.MODEL, Constants.OPTIM, Constants.TRAIN_LOADER}
         self.OUTPUT_KEYS = {Constants.LOSSES}
@@ -112,8 +125,11 @@ class Train(StackElement):
         best_weights = None
         losses = []
 
-        if self.model_save_path is not None:
-            utils.maybe_create_dirs(utils.get_dir_name(self.model_save_path))
+        wandb.init(project=self.project, group=self.group, name=self.run_name)
+        if self.model_save_path is None:
+            self.model_save_path = os.path.join(wandb.run.dir, 'models', 'best_model.pt')
+
+        utils.maybe_create_dirs(utils.get_dir_name(self.model_save_path))
 
         for epoch in range(1, self.epochs + 1):
 
@@ -154,6 +170,7 @@ class Train(StackElement):
                 step += 1
 
             avg_loss = train_loss / len(train_loader.dataset)
+            wandb.log({'epoch': epoch, 'avg_loss': avg_loss})
             self.logger.info('====> Epoch: {} Average loss: {:.6f}'.format(epoch, avg_loss))
 
             if avg_loss < best_loss:
@@ -170,6 +187,8 @@ class Train(StackElement):
         # move an intermediate model to the final save path
         if self.model_save_path is not None:
             shutil.move(utils.get_intermediate_save_path(self.model_save_path), self.model_save_path)
+
+        wandb.finish()
 
         return {Constants.LOSSES: losses}
 
@@ -213,9 +232,9 @@ class Eval(StackElement):
                 data_batch = [[t.to(self.device) for t in tensor] for tensor in data_batch]
 
                 if self.dedup:
-                    observations, actions, state_ids = data_batch[:3]
+                    observations, (actions,), state_ids = data_batch[:3]
                 else:
-                    observations, actions = data_batch[:2]
+                    observations, (actions,) = data_batch[:2]
 
                 if observations[0].size(0) != self.batch_size:
                     continue
@@ -230,7 +249,7 @@ class Eval(StackElement):
 
                 pred_state = state
                 for i in range(self.num_steps):
-                    pred_state = model.forward_transition(pred_state, actions[i])
+                    pred_state = model.forward_transition(pred_state, actions[:, i])
 
                 if viz:
                     self.logger.info("Visualizing predictions.")

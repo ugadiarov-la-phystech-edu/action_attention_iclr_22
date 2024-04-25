@@ -42,6 +42,10 @@ class CSWM(nn.Module):
 
         encoder = config[Constants.ENCODER]
         num_channels = 3
+        image_height = config[Constants.IMAGE_HEIGHT]
+        image_width = config[Constants.IMAGE_WIDTH]
+
+        dummy = torch.zeros((1, num_channels, image_height, image_width), dtype=torch.float32)
 
         if encoder == 'small':
             self.obj_extractor = EncoderCNNSmall(
@@ -49,8 +53,6 @@ class CSWM(nn.Module):
                 hidden_dim=self.cnn_hidden_dim,
                 num_objects=self.num_objects)
             # CNN image size changes
-            width_height = np.array([50, 50])
-            width_height = width_height // 10
         elif encoder == 'medium':
             num_channels = 6
             self.obj_extractor = EncoderCNNMedium(
@@ -58,17 +60,16 @@ class CSWM(nn.Module):
                 hidden_dim=self.cnn_hidden_dim,
                 num_objects=self.num_objects)
             # CNN image size changes
-            width_height = np.array([50, 50])
-            width_height = width_height // 5
         elif encoder == 'large':
             self.obj_extractor = EncoderCNNLarge(
                 input_dim=num_channels,
                 hidden_dim=self.cnn_hidden_dim,
                 num_objects=self.num_objects)
-            width_height = np.array([50, 50])
+
+        height_width = self.obj_extractor(dummy).size()[-2:]
 
         self.obj_encoder = EncoderMLP(
-            input_dim=np.prod(width_height),
+            input_dim=np.prod(height_width),
             hidden_dim=self.mlp_hidden_dim,
             output_dim=self.embedding_dim,
             num_objects=self.num_objects)

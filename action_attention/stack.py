@@ -75,7 +75,7 @@ class StackElement:
         bundle_keys = set(bundle.keys())
         keys = set(keys)
 
-        if keys.issubset(bundle_keys.intersection(keys)):
+        if len(keys) == 0 or keys.issubset(bundle_keys.intersection(keys)):
             return
         else:
             self.logger.error("Error: input/output keys do not match specification: {:s}.".format(

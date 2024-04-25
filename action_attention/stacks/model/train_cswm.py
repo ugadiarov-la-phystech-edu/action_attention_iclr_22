@@ -1,6 +1,7 @@
 import copy as cp
 import os
 import shutil
+import time
 from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
@@ -131,6 +132,8 @@ class Train(StackElement):
 
         utils.maybe_create_dirs(utils.get_dir_name(self.model_save_path))
 
+        start_time = time.time()
+
         for epoch in range(1, self.epochs + 1):
 
             model.train()
@@ -170,7 +173,7 @@ class Train(StackElement):
                 step += 1
 
             avg_loss = train_loss / len(train_loader.dataset)
-            wandb.log({'epoch': epoch, 'avg_loss': avg_loss})
+            wandb.log({'epoch': epoch, 'avg_loss': avg_loss, 'epochs/hours': epoch / (time.time() - start_time) * 60 * 60})
             self.logger.info('====> Epoch: {} Average loss: {:.6f}'.format(epoch, avg_loss))
 
             if avg_loss < best_loss:

@@ -74,7 +74,7 @@ class OfflineEnvironmentDataset(Dataset):
         start_step = (index % self.indexes_per_episode) * self.clip_length
         last_step = start_step + self.path_length
         observations = [self.preprocess_image(self.load_obs(obs)) for obs in self.info[ep]["obs"][start_step:last_step + 1]]
-        actions = self.load_npy(self.info[index]['actions'])[start_step:last_step]
+        actions = self.load_npy(self.info[ep]['actions'])[start_step:last_step]
 
         return observations, (actions,)
 
